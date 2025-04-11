@@ -42,6 +42,6 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./apps/api
-          tags: ${{ steps.meta_api.outputs.tags }
+          tags: ${{ steps.meta_api.outputs.tags }}
           labels: ${{ steps.meta_api.outputs.labels }}
           push: true
