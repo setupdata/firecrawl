@@ -34,14 +34,20 @@ jobs:
         id: meta_api
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/firecrawl:latest
+          images: ghcr.io/${{ github.repository_owner }}/firecrawl
+          tags: |
+            type=ref,event=tag
+            type=sha
 
       # --- Metadata for firecrawl-playwright image (apps/playwright-service) ---
       - name: Extract metadata for firecrawl-playwright
         id: meta_playwright
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/firecrawl-playwright:latest
+          images: ghcr.io/${{ github.repository_owner }}/firecrawl-playwright
+          tags: |
+            type=ref,event=tag
+            type=sha
 
       # --- Build and push firecrawl image ---
       - name: Build and push firecrawl image
