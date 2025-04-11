@@ -1,0 +1,64 @@
+name: Upstream Sync
+
+permissions:
+  contents: write
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # every day at midnight UTC
+  workflow_dispatch:
+
+jobs:
+  sync_with_upstream:
+    name: Sync Fork with Upstream (Branch & Tags)
+    runs-on: ubuntu-latest
+    if: ${{ github.event.repository.fork }}
+
+    env:
+      UPSTREAM_REPO: mendableai/firecrawl
+      UPSTREAM_BRANCH: main
+      DOWNSTREAM_BRANCH: main
+
+    steps:
+      # Step 1: Checkout the fork's repository
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Step 2: Configure Git user
+      - name: Set up Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # Step 3: Sync the primary branch using the dedicated action
+      - name: Sync upstream branch changes
+        id: sync
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
+        with:
+          upstream_sync_repo: ${{ env.UPSTREAM_REPO }}
+          upstream_sync_branch: ${{ env.UPSTREAM_BRANCH }}
+          target_sync_branch: ${{ env.DOWNSTREAM_BRANCH }}
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+          test_mode: false
+
+      # Step 4: Report potential sync issues (original check)
+      - name: Check for sync action failure (potential workflow pause)
+        if: failure() && steps.sync.outcome == 'failure'
+        run: |
+          echo "[Error] Sync action failed. This might be due to upstream workflow file changes causing GitHub to pause scheduled runs."
+          echo "[Error] Please check the action logs and consider manually syncing your fork if needed."
+          echo "[Error] See: https://github.blog/changelog/2021-02-19-github-actions-workflows-triggered-by-dependabot-prs-will-run-with-read-only-permissions/"
+          exit 1
+
+      # Step 5: Final check for new commits (optional informational step)
+      - name: Report sync status
+        if: success() # Only run if all previous non-failing steps succeeded
+        run: |
+          if [[ "${{ steps.sync.outputs.has_new_commits }}" == "true" ]]; then
+            echo "Successfully synced new commits from upstream/${{ env.UPSTREAM_BRANCH }} to origin/${{ env.DOWNSTREAM_BRANCH }}."
+          else
+            echo "No new commits to sync from upstream/${{ env.UPSTREAM_BRANCH }}. Fork branch is up-to-date."
+          fi
+          # You might want to add a check here based on the exit code of the tag push step if continue-on-error was true

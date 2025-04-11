@@ -1,15 +1,14 @@
-name: STAGING Deploy Images to GHCR
-
-env:
-  DOTNET_VERSION: '6.0.x'
+name: Publish Docker images (amd64)
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - apps/playwright-service-ts/**
+    tags:
+      - 'v*.*.*'  # 匹配类似 v1.0.0 的 tag
   workflow_dispatch:
+    inputs:
+      name:
+        description: 'reason'
+        required: false
 
 jobs:
   push_to_registries:
@@ -30,12 +29,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # --- Metadata for firecrawl image (apps/api) ---
+      - name: Extract metadata for firecrawl
+        id: meta_api
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/firecrawl:latest
+
       # --- Metadata for firecrawl-playwright image (apps/playwright-service) ---
       - name: Extract metadata for firecrawl-playwright
         id: meta_playwright
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository_owner }}/firecrawl-playwright:latest
+
+      # --- Build and push firecrawl image ---
+      - name: Build and push firecrawl image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/api
+          tags: ${{ steps.meta_api.outputs.tags }
+          labels: ${{ steps.meta_api.outputs.labels }}
+          push: true
 
       # --- Build and push firecrawl-playwright image ---
       - name: Build and push firecrawl-playwright image
