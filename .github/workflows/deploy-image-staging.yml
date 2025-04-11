@@ -35,7 +35,9 @@ jobs:
         id: meta_playwright
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/firecrawl-playwright:latest
+          images: ghcr.io/${{ github.repository_owner }}/firecrawl-playwright
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
 
       # --- Build and push firecrawl-playwright image ---
       - name: Build and push firecrawl-playwright image
