@@ -6,7 +6,7 @@ import gitDiff from 'git-diff';
 import parseDiff from 'parse-diff';
 import { generateCompletions } from "./llmExtract";
 
-async function extractDataWithSchema(content: string, meta: Meta): Promise<any> {
+async function extractDataWithSchema(content: string, meta: Meta): Promise<{ extract: any } | null> {
     try {
         const { extract } = await generateCompletions({
             logger: meta.logger.child({
@@ -18,9 +18,16 @@ async function extractDataWithSchema(content: string, meta: Meta): Promise<any> 
                 systemPrompt: "Extract the requested information from the content based on the provided schema.",
                 temperature: 0
             },
-            markdown: content
+            markdown: content,
+            costTrackingOptions: {
+                costTracking: meta.costTracking,
+                metadata: {
+                    module: "extract",
+                    method: "extractDataWithSchema",
+                },
+            },
         });
-        return extract;
+        return { extract };
     } catch (error) {
         meta.logger.error("Error extracting data with schema", { error });
         return null;
@@ -144,7 +151,7 @@ export async function deriveDiff(meta: Meta, document: Document): Promise<Docume
                     await extractDataWithSchema(currentMarkdown, meta) : null;
                 
                 if (previousData && currentData) {
-                    document.changeTracking.json = compareExtractedData(previousData, currentData);
+                    document.changeTracking.json = compareExtractedData(previousData.extract, currentData.extract);
                 } else {
                     const { extract } = await generateCompletions({
                         logger: meta.logger.child({
@@ -158,9 +165,16 @@ export async function deriveDiff(meta: Meta, document: Document): Promise<Docume
                             temperature: 0
                         },
                         markdown: `Previous Content:\n${previousMarkdown}\n\nCurrent Content:\n${currentMarkdown}`,
-                        previousWarning: document.warning
+                        previousWarning: document.warning,
+                        costTrackingOptions: {
+                            costTracking: meta.costTracking,
+                            metadata: {
+                                module: "diff",
+                                method: "deriveDiff",
+                            },
+                        },
                     });
-                    
+
                     document.changeTracking.json = extract;
                 }
             } catch (error) {

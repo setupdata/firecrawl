@@ -1,5 +1,5 @@
 import { parseApi } from "../lib/parseApi";
-import { getRateLimiter, isTestSuiteToken } from "../services/rate-limiter";
+import { getRateLimiter } from "../services/rate-limiter";
 import {
   AuthResponse,
   NotificationType,
@@ -75,11 +75,11 @@ export async function setCachedACUC(
 const mockPreviewACUC: (team_id: string, is_extract: boolean) => AuthCreditUsageChunk = (team_id, is_extract) => ({
   api_key: "preview",
   team_id,
-  sub_id: "bypass",
-  sub_current_period_start: new Date().toISOString(),
-  sub_current_period_end: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-  sub_user_id: "bypass",
-  price_id: "bypass",
+  sub_id: null,
+  sub_current_period_start: null,
+  sub_current_period_end: null,
+  sub_user_id: null,
+  price_id: null,
   rate_limits: {
     crawl: 2,
     scrape: 10,
@@ -89,6 +89,8 @@ const mockPreviewACUC: (team_id: string, is_extract: boolean) => AuthCreditUsage
     preview: 5,
     crawlStatus: 500,
     extractStatus: 500,
+    extractAgentPreview: 1,
+    scrapeAgentPreview: 5,
   },
   price_credits: 99999999,
   credits_used: 0,
@@ -121,6 +123,8 @@ const mockACUC: () => AuthCreditUsageChunk = () => ({
     preview: 99999999,
     crawlStatus: 99999999,
     extractStatus: 99999999,
+    extractAgentPreview: 99999999,
+    scrapeAgentPreview: 99999999,
   },
   price_credits: 99999999,
   credits_used: 0,
@@ -144,7 +148,8 @@ export async function getACUC(
 ): Promise<AuthCreditUsageChunk | null> {
   let isExtract =
       mode === RateLimiterMode.Extract ||
-      mode === RateLimiterMode.ExtractStatus;
+      mode === RateLimiterMode.ExtractStatus ||
+      mode === RateLimiterMode.ExtractAgentPreview;
 
   if (api_key === process.env.PREVIEW_TOKEN) {
     const acuc = mockPreviewACUC(api_key, isExtract);
@@ -260,7 +265,8 @@ export async function getACUCTeam(
 ): Promise<AuthCreditUsageChunkFromTeam | null> {
   let isExtract =
       mode === RateLimiterMode.Extract ||
-      mode === RateLimiterMode.ExtractStatus;
+      mode === RateLimiterMode.ExtractStatus ||
+      mode === RateLimiterMode.ExtractAgentPreview;
 
   if (team_id.startsWith("preview")) {
     const acuc = mockPreviewACUC(team_id, isExtract);
