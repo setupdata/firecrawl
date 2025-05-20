@@ -24,8 +24,18 @@ export type Format =
 export const url = z.preprocess(
   (x) => {
     if (!protocolIncluded(x as string)) {
-      return `http://${x}`;
+      x = `http://${x}`;
     }
+    
+    try {
+      const urlObj = new URL(x as string);
+      if (urlObj.search) {
+        const searchParams = new URLSearchParams(urlObj.search.substring(1));
+        return `${urlObj.origin}${urlObj.pathname}?${searchParams.toString()}`;
+      }
+    } catch (e) {
+    }
+    
     return x;
   },
   z
@@ -298,7 +308,7 @@ const baseScrapeOptions = z
     fastMode: z.boolean().default(false),
     useMock: z.string().optional(),
     blockAds: z.boolean().default(true),
-    proxy: z.enum(["basic", "stealth"]).optional(),
+    proxy: z.enum(["basic", "stealth", "auto"]).optional(),
   })
   .strict(strictMessage);
 
@@ -350,7 +360,7 @@ const extractTransform = (obj) => {
     obj = { ...obj, timeout: 300000 };
   }
 
-  if (obj.proxy === "stealth" && obj.timeout === 30000) {
+  if ((obj.proxy === "stealth" || obj.proxy === "auto") && obj.timeout === 30000) {
     obj = { ...obj, timeout: 120000 };
   }
 
@@ -738,6 +748,7 @@ export type Document = {
     statusCode: number;
     scrapeId?: string;
     error?: string;
+    proxyUsed: "basic" | "stealth";
     // [key: string]: string | string[] | number | { smartScrape: number; other: number; total: number } | undefined;
   };
   serpResults?: {
