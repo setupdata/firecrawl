@@ -309,6 +309,8 @@ const baseScrapeOptions = z
     useMock: z.string().optional(),
     blockAds: z.boolean().default(true),
     proxy: z.enum(["basic", "stealth", "auto"]).optional(),
+    __experimental_cache: z.boolean().default(false).optional(),
+    __searchPreviewToken: z.string().optional(),
   })
   .strict(strictMessage);
 
@@ -750,6 +752,7 @@ export type Document = {
     scrapeId?: string;
     error?: string;
     numPages?: number;
+    contentType?: string;
     proxyUsed: "basic" | "stealth";
     // [key: string]: string | string[] | number | { smartScrape: number; other: number; total: number } | undefined;
   };
@@ -1166,6 +1169,7 @@ export const searchRequestSchema = z
     origin: z.string().optional().default("api"),
     timeout: z.number().int().positive().finite().safe().default(60000),
     ignoreInvalidURLs: z.boolean().optional().default(false),
+    __searchPreviewToken: z.string().optional(),
     scrapeOptions: baseScrapeOptions
       .extend({
         formats: z

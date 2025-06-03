@@ -224,7 +224,6 @@ export async function scrapeURLWithFireEngineChromeCDP(
     mobile: meta.options.mobile,
     timeout, // TODO: better timeout logic
     disableSmartWaitCache: meta.internalOptions.disableSmartWaitCache,
-    blockAds: meta.options.blockAds,
     mobileProxy: meta.featureFlags.has("stealthProxy"),
     saveScrapeResultToGCS: meta.internalOptions.saveScrapeResultToGCS,
     // TODO: scrollXPaths
@@ -245,18 +244,18 @@ export async function scrapeURLWithFireEngineChromeCDP(
     meta.options.formats.includes("screenshot") ||
     meta.options.formats.includes("screenshot@fullPage")
   ) {
-    meta.logger.debug(
-      "Transforming screenshots from actions into screenshot field",
-      { screenshots: response.screenshots },
-    );
+    // meta.logger.debug(
+    //   "Transforming screenshots from actions into screenshot field",
+    //   { screenshots: response.screenshots },
+    // );
     if (response.screenshots) {
       response.screenshot = response.screenshots.slice(-1)[0];
       response.screenshots = response.screenshots.slice(0, -1);
     }
-    meta.logger.debug("Screenshot transformation done", {
-      screenshots: response.screenshots,
-      screenshot: response.screenshot,
-    });
+    // meta.logger.debug("Screenshot transformation done", {
+    //   screenshots: response.screenshots,
+    //   screenshot: response.screenshot,
+    // });
   }
 
   if (!response.url) {
@@ -272,6 +271,10 @@ export async function scrapeURLWithFireEngineChromeCDP(
     html: response.content,
     error: response.pageError,
     statusCode: response.pageStatusCode,
+
+    contentType: (Object.entries(response.responseHeaders ?? {}).find(
+      (x) => x[0].toLowerCase() === "content-type",
+    ) ?? [])[1] ?? undefined,
 
     screenshot: response.screenshot,
     ...(actions.length > 0
@@ -336,6 +339,10 @@ export async function scrapeURLWithFireEnginePlaywright(
     error: response.pageError,
     statusCode: response.pageStatusCode,
 
+    contentType: (Object.entries(response.responseHeaders ?? {}).find(
+      (x) => x[0].toLowerCase() === "content-type",
+    ) ?? [])[1] ?? undefined,
+
     ...(response.screenshots !== undefined && response.screenshots.length > 0
       ? {
           screenshot: response.screenshots[0],
@@ -391,5 +398,9 @@ export async function scrapeURLWithFireEngineTLSClient(
     html: response.content,
     error: response.pageError,
     statusCode: response.pageStatusCode,
+
+    contentType: (Object.entries(response.responseHeaders ?? {}).find(
+      (x) => x[0].toLowerCase() === "content-type",
+    ) ?? [])[1] ?? undefined,
   };
 }

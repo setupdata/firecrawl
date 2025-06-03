@@ -69,6 +69,7 @@ export const featureFlags = [
   "skipTlsVerification",
   "useFastMode",
   "stealthProxy",
+  "disableAdblock",
 ] as const;
 
 export type FeatureFlag = (typeof featureFlags)[number];
@@ -90,6 +91,7 @@ export const featureFlagOptions: {
   mobile: { priority: 10 },
   skipTlsVerification: { priority: 10 },
   stealthProxy: { priority: 20 },
+  disableAdblock: { priority: 10 },
 } as const;
 
 export type EngineScrapeResult = {
@@ -111,6 +113,8 @@ export type EngineScrapeResult = {
   };
 
   numPages?: number;
+
+  contentType?: string;
 };
 
 const engineHandlers: {
@@ -158,6 +162,7 @@ export const engineOptions: {
       skipTlsVerification: false,
       useFastMode: false,
       stealthProxy: false,
+      disableAdblock: false,
     },
     quality: 1000, // cache should always be tried first
   },
@@ -175,6 +180,7 @@ export const engineOptions: {
       skipTlsVerification: true,
       useFastMode: false,
       stealthProxy: false,
+      disableAdblock: false,
     },
     quality: 50,
   },
@@ -192,6 +198,7 @@ export const engineOptions: {
       skipTlsVerification: true,
       useFastMode: false,
       stealthProxy: false,
+      disableAdblock: false,
     },
     quality: 45,
   },
@@ -209,6 +216,7 @@ export const engineOptions: {
       skipTlsVerification: true,
       useFastMode: false,
       stealthProxy: true,
+      disableAdblock: false,
     },
     quality: -1,
   },
@@ -226,6 +234,7 @@ export const engineOptions: {
       skipTlsVerification: true,
       useFastMode: false,
       stealthProxy: true,
+      disableAdblock: false,
     },
     quality: -5,
   },
@@ -243,6 +252,7 @@ export const engineOptions: {
       skipTlsVerification: false,
       useFastMode: false,
       stealthProxy: false,
+      disableAdblock: true,
     },
     quality: 40,
   },
@@ -260,6 +270,7 @@ export const engineOptions: {
       skipTlsVerification: false,
       useFastMode: false,
       stealthProxy: true,
+      disableAdblock: true,
     },
     quality: -10,
   },
@@ -277,6 +288,7 @@ export const engineOptions: {
       skipTlsVerification: false,
       useFastMode: false,
       stealthProxy: false,
+      disableAdblock: false,
     },
     quality: 20,
   },
@@ -294,6 +306,7 @@ export const engineOptions: {
       skipTlsVerification: false,
       useFastMode: true,
       stealthProxy: false,
+      disableAdblock: false,
     },
     quality: 10,
   },
@@ -311,6 +324,7 @@ export const engineOptions: {
       skipTlsVerification: false,
       useFastMode: true,
       stealthProxy: true,
+      disableAdblock: false,
     },
     quality: -15,
   },
@@ -328,6 +342,7 @@ export const engineOptions: {
       skipTlsVerification: false,
       useFastMode: true,
       stealthProxy: false,
+      disableAdblock: false,
     },
     quality: 5,
   },
@@ -345,6 +360,7 @@ export const engineOptions: {
       skipTlsVerification: false,
       useFastMode: true,
       stealthProxy: true, // kinda...
+      disableAdblock: true,
     },
     quality: -20,
   },
@@ -362,6 +378,7 @@ export const engineOptions: {
       skipTlsVerification: false,
       useFastMode: true,
       stealthProxy: true, // kinda...
+      disableAdblock: true,
     },
     quality: -20,
   },
@@ -383,9 +400,8 @@ export function buildFallbackList(meta: Meta): {
     if (cacheIndex !== -1) {
       _engines.splice(cacheIndex, 1);
     }
-  } else {
-    meta.logger.debug("Cache engine enabled by useCache option");
   }
+  
   const prioritySum = [...meta.featureFlags].reduce(
     (a, x) => a + featureFlagOptions[x].priority,
     0,
@@ -424,24 +440,6 @@ export function buildFallbackList(meta: Meta): {
 
     if (supportScore >= priorityThreshold) {
       selectedEngines.push({ engine, supportScore, unsupportedFeatures });
-      meta.logger.debug(`Engine ${engine} meets feature priority threshold`, {
-        supportScore,
-        prioritySum,
-        priorityThreshold,
-        featureFlags: [...meta.featureFlags],
-        unsupportedFeatures,
-      });
-    } else {
-      meta.logger.debug(
-        `Engine ${engine} does not meet feature priority threshold`,
-        {
-          supportScore,
-          prioritySum,
-          priorityThreshold,
-          featureFlags: [...meta.featureFlags],
-          unsupportedFeatures,
-        },
-      );
     }
   }
 
@@ -458,6 +456,10 @@ export function buildFallbackList(meta: Meta): {
         engineOptions[b.engine].quality - engineOptions[a.engine].quality,
     );
   }
+
+  meta.logger.info("Selected engines", {
+    selectedEngines,
+  });
 
   return selectedEngines;
 }
