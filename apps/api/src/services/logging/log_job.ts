@@ -2,7 +2,7 @@ import { supabase_service } from "../supabase";
 import { FirecrawlJob } from "../../types";
 import { posthog } from "../posthog";
 import "dotenv/config";
-import { logger } from "../../lib/logger";
+import { logger as _logger } from "../../lib/logger";
 import { configDotenv } from "dotenv";
 import { saveJobToGCS } from "../../lib/gcs-jobs";
 configDotenv();
@@ -22,13 +22,32 @@ function cleanOfNull<T>(x: T): T {
 }
 
 export async function logJob(job: FirecrawlJob, force: boolean = false, bypassLogging: boolean = false) {
+  let logger = _logger.child({
+    module: "log_job",
+    method: "logJob",
+    ...(job.mode === "scrape" || job.mode === "single_urls" || job.mode === "single_url" ? ({
+      scrapeId: job.job_id,
+    }) : {}),
+    ...(job.mode === "crawl" || job.mode === "batch_scrape" ? ({
+      crawlId: job.job_id,
+    }) : {}),
+    ...(job.mode === "extract" ? ({
+      extractId: job.job_id,
+    }) : {}),
+  });
+
+  const zeroDataRetention = job.zeroDataRetention ?? false;
+
+  logger = logger.child({
+    zeroDataRetention,
+  });
+
   try {
     const useDbAuthentication = process.env.USE_DB_AUTHENTICATION === "true";
     if (!useDbAuthentication) {
       return;
     }
     
-
     // Redact any pages that have an authorization header
     // actually, Don't. we use the db to retrieve results now. this breaks authed crawls - mogery
     // if (
@@ -47,24 +66,27 @@ export async function logJob(job: FirecrawlJob, force: boolean = false, bypassLo
     const jobColumn = {
       job_id: job.job_id ? job.job_id : null,
       success: job.success,
-      message: job.message,
+      message: zeroDataRetention ? null : job.message,
       num_docs: job.num_docs,
-      docs: ((job.mode === "single_urls" || job.mode === "scrape") && process.env.GCS_BUCKET_NAME) ? null : cleanOfNull(job.docs),
+      docs: zeroDataRetention ? null : ((job.mode === "single_urls" || job.mode === "scrape") && process.env.GCS_BUCKET_NAME) ? null : cleanOfNull(job.docs),
       time_taken: job.time_taken,
       team_id: (job.team_id === "preview" || job.team_id?.startsWith("preview_"))? null : job.team_id,
       mode: job.mode,
-      url: job.url,
-      crawler_options: job.crawlerOptions,
-      page_options: job.scrapeOptions,
-      origin: job.origin,
+      url: zeroDataRetention ? "<redacted due to zero data retention>" : job.url,
+      crawler_options: zeroDataRetention ? null : job.crawlerOptions,
+      page_options: zeroDataRetention ? null : job.scrapeOptions,
+      origin: zeroDataRetention ? null : job.origin,
+      integration: zeroDataRetention ? null : job.integration ?? null,
       num_tokens: job.num_tokens,
       retry: !!job.retry,
       crawl_id: job.crawl_id,
       tokens_billed: job.tokens_billed,
       is_migrated: true,
-      cost_tracking: job.cost_tracking,
-      pdf_num_pages: job.pdf_num_pages ?? null,
+      cost_tracking: zeroDataRetention ? null : job.cost_tracking,
+      pdf_num_pages: zeroDataRetention ? null : job.pdf_num_pages ?? null,
       credits_billed: job.credits_billed ?? null,
+      change_tracking_tag: zeroDataRetention ? null : job.change_tracking_tag ?? null,
+      dr_clean_by: zeroDataRetention && job.crawl_id ? new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString() : null,
     };
 
     if (process.env.GCS_BUCKET_NAME) {
@@ -86,7 +108,7 @@ export async function logJob(job: FirecrawlJob, force: boolean = false, bypassLo
           if (error) {
             logger.error(
               "Failed to log job due to Supabase error -- trying again",
-              { error, scrapeId: job.job_id },
+              { error },
             );
             await new Promise<void>((resolve) =>
               setTimeout(() => resolve(), 75),
@@ -98,27 +120,26 @@ export async function logJob(job: FirecrawlJob, force: boolean = false, bypassLo
         } catch (error) {
           logger.error(
             "Failed to log job due to thrown error -- trying again",
-            { error, scrapeId: job.job_id },
+            { error },
           );
           await new Promise<void>((resolve) => setTimeout(() => resolve(), 75));
         }
       }
       if (done) {
-        logger.debug("Job logged successfully!", { scrapeId: job.job_id });
+        logger.debug("Job logged successfully!");
       } else {
-        logger.error("Failed to log job!", { scrapeId: job.job_id });
+        logger.error("Failed to log job!");
       }
     } else {
       const { error } = await supabase_service
         .from("firecrawl_jobs")
         .insert([jobColumn]);
       if (error) {
-        logger.error(`Error logging job: ${error.message}`, {
+        logger.error(`Error logging job`, {
           error,
-          scrapeId: job.job_id,
         });
       } else {
-        logger.debug("Job logged successfully!", { scrapeId: job.job_id });
+        logger.debug("Job logged successfully!");
       }
     }
 
@@ -131,20 +152,21 @@ export async function logJob(job: FirecrawlJob, force: boolean = false, bypassLo
         event: "job-logged",
         properties: {
           success: job.success,
-          message: job.message,
+          message: zeroDataRetention ? null: job.message,
           num_docs: job.num_docs,
           time_taken: job.time_taken,
           team_id: (job.team_id === "preview" || job.team_id?.startsWith("preview_"))? null : job.team_id,
           mode: job.mode,
-          url: job.url,
-          crawler_options: job.crawlerOptions,
-          page_options: job.scrapeOptions,
-          origin: job.origin,
+          url: zeroDataRetention ? "<redacted due to zero data retention>" : job.url,
+          crawler_options: zeroDataRetention ? null : job.crawlerOptions,
+          page_options: zeroDataRetention ? null : job.scrapeOptions,
+          origin: zeroDataRetention ? null : job.origin,
           num_tokens: job.num_tokens,
           retry: job.retry,
           tokens_billed: job.tokens_billed,
-          cost_tracking: job.cost_tracking,
-          pdf_num_pages: job.pdf_num_pages,
+          cost_tracking: zeroDataRetention ? null : job.cost_tracking,
+          pdf_num_pages: zeroDataRetention ? null : job.pdf_num_pages,
+          change_tracking_tag: zeroDataRetention ? null : job.change_tracking_tag ?? null,
         },
       };
       if (job.mode !== "single_urls") {
@@ -152,6 +174,8 @@ export async function logJob(job: FirecrawlJob, force: boolean = false, bypassLo
       }
     }
   } catch (error) {
-    logger.error(`Error logging job: ${error.message}`);
+    logger.error(`Error logging job`, {
+      error,
+    });
   }
 }
